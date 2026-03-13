@@ -4,11 +4,41 @@ import { supabase } from "../lib/supabase.js";
 
 export default function DashboardPage() {
   const [userEmail, setUserEmail] = React.useState("");
+  const [profiles, setProfiles] = React.useState([]);
+  const [businesses, setBusinesses] = React.useState([]);
+  const [loading, setLoading] = React.useState(true);
+  const [errorMsg, setErrorMsg] = React.useState("");
 
   React.useEffect(() => {
-    supabase.auth.getUser().then(({ data }) => {
-      setUserEmail(data?.user?.email || "");
-    });
+    async function loadData() {
+      setLoading(true);
+      setErrorMsg("");
+
+      const { data: userData } = await supabase.auth.getUser();
+      setUserEmail(userData?.user?.email || "");
+
+      const { data: profilesData, error: profilesError } = await supabase
+        .from("profiles")
+        .select("*")
+        .order("full_name", { ascending: true });
+
+      const { data: businessesData, error: businessesError } = await supabase
+        .from("business_info")
+        .select("*")
+        .order("business_name", { ascending: true });
+
+      if (profilesError || businessesError) {
+        setErrorMsg(
+          profilesError?.message || businessesError?.message || "Erro ao carregar dados."
+        );
+      }
+
+      setProfiles(profilesData || []);
+      setBusinesses(businessesData || []);
+      setLoading(false);
+    }
+
+    loadData();
   }, []);
 
   async function handleLogout() {
@@ -32,24 +62,54 @@ export default function DashboardPage() {
       <main className="section">
         <div className="container">
           <h1 className="sectionTitle">Dashboard</h1>
-          <p className="sectionSub">Bem-vindo{userEmail ? `, ${userEmail}` : ""}.</p>
+          <p className="sectionSub">
+            Bem-vindo{userEmail ? `, ${userEmail}` : ""}.
+          </p>
 
-          <div className="cards3">
-            <div className="card">
-              <h3>O meu Perfil</h3>
-              <p>Aqui vamos mostrar os dados do barbeiro e da barbearia.</p>
-            </div>
+          {loading && <p className="muted">A carregar dados...</p>}
+          {errorMsg && <p className="muted">{errorMsg}</p>}
 
-            <div className="card">
-              <h3>Diretório</h3>
-              <p>Mais tarde vamos listar barbeiros e barbearias aqui.</p>
-            </div>
+          {!loading && !errorMsg && (
+            <>
+              <section style={{ marginTop: "30px" }}>
+                <h2 style={{ marginBottom: "18px" }}>Barbeiros</h2>
+                <div className="cards3">
+                  {profiles.length === 0 && (
+                    <div className="card">
+                      <p>Não existem barbeiros para mostrar.</p>
+                    </div>
+                  )}
 
-            <div className="card">
-              <h3>Agendamento</h3>
-              <p>O barbeiro poderá colocar o link da sua agenda externa.</p>
-            </div>
-          </div>
+                  {profiles.map((profile) => (
+                    <div className="card" key={profile.id}>
+                      <h3>{profile.full_name || profile.username || "Sem nome"}</h3>
+                      <p>{profile.website || "Sem website"}</p>
+                      <p className="muted">{profile.id}</p>
+                    </div>
+                  ))}
+                </div>
+              </section>
+
+              <section style={{ marginTop: "50px" }}>
+                <h2 style={{ marginBottom: "18px" }}>Barbearias</h2>
+                <div className="cards3">
+                  {businesses.length === 0 && (
+                    <div className="card">
+                      <p>Não existem barbearias para mostrar.</p>
+                    </div>
+                  )}
+
+                  {businesses.map((business) => (
+                    <div className="card" key={business.id}>
+                      <h3>{business.business_name || "Sem nome"}</h3>
+                      <p>{business.description || "Sem descrição"}</p>
+                      <p className="muted">{business.address || "Sem morada"}</p>
+                    </div>
+                  ))}
+                </div>
+              </section>
+            </>
+          )}
         </div>
       </main>
     </div>
